@@ -169,8 +169,8 @@ export namespace GameLauncher {
             opts.native
         );
 
-        // FlatImage executables must run as fully detached processes (like AppImages).
-        // No cwd/env override — let the FlatImage manage its own environment.
+        // FlatImage: launch as a fully detached process with absolute path.
+        // Matches the reference implementation (docs/reference/GameLauncher.ref.js).
         if (opts.game.platform === "Flatimage") {
             if (!fs.existsSync(gamePath)) {
                 const msg = `[ERROR] FlatImage not found: "${gamePath}"`;
@@ -182,33 +182,9 @@ export namespace GameLauncher {
                 fs.chmodSync(gamePath, 0o755);
             } catch { /* non-fatal */ }
 
-            // Run as "./filename" from its own directory — matches how file managers
-            // double-click executables. Some FlatImages use $0 to find their own path.
-            const flatimageDir = path.dirname(gamePath);
-            const flatimageFilename = `./${path.basename(gamePath)}`;
-            const proc = spawn(flatimageFilename, [], {
+            const proc = spawn(gamePath, [], {
                 detached: true,
-                stdio: ["ignore", "ignore", "pipe"],
-                cwd: flatimageDir,
-            });
-
-            // Capture stderr for a few seconds to catch early errors
-            if (proc.stderr) {
-                const chunks: string[] = [];
-                proc.stderr.on("data", (d: Buffer) => chunks.push(d.toString()));
-                setTimeout(() => {
-                    if (chunks.length > 0) {
-                        const msg = `[FlatImage stderr] "${opts.game.title}": ${chunks.join("")}`;
-                        log(logSource, msg);
-                        console.error(msg);
-                    }
-                }, 3000);
-            }
-
-            proc.on("error", (err) => {
-                const msg = `[ERROR] Failed to spawn FlatImage "${opts.game.title}": ${err.message}`;
-                log(logSource, msg);
-                console.error(msg);
+                stdio: "ignore",
             });
 
             proc.unref();
