@@ -185,6 +185,7 @@ export namespace GameLauncher {
             const proc = spawn(gamePath, [], {
                 detached: true,
                 stdio: ["ignore", "ignore", "pipe"],
+                cwd: path.dirname(gamePath),
             });
 
             // Capture stderr for a few seconds to catch early errors
