@@ -47,10 +47,16 @@ export function addGamesMiddleware() {
                 );
 
                 const readPlatformsStart = Date.now();
-                const { platforms } = await readPlatformsFile(
-                    path.join(platformsPath, "../Platforms.xml")
-                );
-                console.log(`[PERF] Read Platforms.xml (${platforms.length} platforms): ${Date.now() - readPlatformsStart}ms`);
+                let platforms: string[] = [];
+                try {
+                    const platformsFile = await readPlatformsFile(
+                        path.join(platformsPath, "../Platforms.xml")
+                    );
+                    platforms = platformsFile.platforms;
+                    console.log(`[PERF] Read Platforms.xml (${platforms.length} platforms): ${Date.now() - readPlatformsStart}ms`);
+                } catch (err) {
+                    console.warn(`[WARN] Platforms.xml not found or unreadable — eXoDOS games will not be loaded. (${err})`);
+                }
 
                 const totalPlatforms = platforms.length;
                 for (let i = 0; i < platforms.length; i++) {
