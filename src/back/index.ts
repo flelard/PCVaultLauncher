@@ -121,7 +121,7 @@ async function initialize(message: any, _: any): Promise<void> {
     await ConfigFile.readOrCreateFile(
         path.join(state.configFolder, configFilename)
     );
-    const exodosPath = state.config.useEmbeddedExodosPath
+    const exodosPath = (state.config.useEmbeddedExodosPath && !content.isDev)
         ? getEmbeddedExodosPath()
         : state.config.exodosPath;
     if (!path.isAbsolute(exodosPath)) {

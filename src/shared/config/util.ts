@@ -27,7 +27,7 @@ const configDataDefaultBase: Readonly<IAppConfigData> = Object.freeze({
     showDeveloperTab: false,
     vlcPort: 39421,
     enableOnlineUpdate: true,
-    useEmbeddedExodosPath: true,
+    useEmbeddedExodosPath: false,
     flatimage: {
         enabled: false,
         flatimageDirectory: "",
