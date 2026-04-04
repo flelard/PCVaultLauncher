@@ -182,10 +182,14 @@ export namespace GameLauncher {
                 fs.chmodSync(gamePath, 0o755);
             } catch { /* non-fatal */ }
 
-            const proc = spawn(gamePath, [], {
+            // Run as "./filename" from its own directory — matches how file managers
+            // double-click executables. Some FlatImages use $0 to find their own path.
+            const flatimageDir = path.dirname(gamePath);
+            const flatimageFilename = `./${path.basename(gamePath)}`;
+            const proc = spawn(flatimageFilename, [], {
                 detached: true,
                 stdio: ["ignore", "ignore", "pipe"],
-                cwd: path.dirname(gamePath),
+                cwd: flatimageDir,
             });
 
             // Capture stderr for a few seconds to catch early errors
