@@ -1,0 +1,278 @@
+import { englishTranslation } from "@renderer/lang/en";
+import { faBorderAll, faForward, faList, faPlay, faRepeat, faStop } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { BackIn } from "@shared/back/types";
+import { BrowsePageLayout } from "@shared/BrowsePageLayout";
+import { updatePreferencesData } from "@shared/preferences/util";
+import { Coerce } from "@shared/utils/Coerce";
+import { throttle } from "@shared/utils/throttle";
+import * as React from "react";
+import { WithPreferencesProps } from "../containers/withPreferences";
+import { gameScaleSpan } from "../Util";
+
+type OwnProps = {
+    /** Total number of games. */
+    totalCount?: number;
+    /** Label of the current browse library (if any). */
+    currentLabel?: string;
+    /** Number of games in the current browse library (if there is a current browse library). */
+    currentCount?: number;
+    /** Value of the scale slider (between 0 and 1). */
+    scaleSliderValue: number;
+    /** Called when the value of the scale slider is changed (value is between 0 and 1). */
+    onScaleSliderChange?: (value: number) => void;
+    /** Current BrowsePage layout. */
+    layout: BrowsePageLayout;
+    /** Called when the value of the layout selector is changed. */
+    onLayoutChange?: (value: BrowsePageLayout) => void;
+    /** Whether the currently selected game has music available. */
+    hasMusicPath?: boolean;
+    /** Whether music is currently playing. */
+    isMusicPlaying: boolean;
+    /** Called to start playing music for the current game. */
+    onPlayMusic: () => void;
+    /** Called to stop playing music. */
+    onStopMusic: () => void;
+};
+
+export type FooterProps = OwnProps & WithPreferencesProps;
+
+/** The footer that is always visible at the bottom of the main window. */
+export class Footer extends React.Component<FooterProps> {
+    static scaleSliderMax: number = 1000;
+    /** Reference to the scale slider. */
+    scaleSliderRef: React.RefObject<HTMLInputElement> = React.createRef();
+
+    componentDidMount() {
+        window.addEventListener("keydown", this.onGlobalKeydown);
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener("keydown", this.onGlobalKeydown);
+    }
+
+    render() {
+        const strings = englishTranslation.app;
+        const {
+            currentCount,
+            currentLabel,
+            hasMusicPath,
+            isMusicPlaying,
+            layout,
+            onPlayMusic,
+            onStopMusic,
+            scaleSliderValue,
+            totalCount,
+        } = this.props;
+        const scale = Math.min(Math.max(0, scaleSliderValue), 1);
+        return (
+            <div className="footer">
+                {/* Left Side */}
+                <div className="footer__wrap">
+                    {/* Game Count */}
+                    <div className="footer__game-count">
+                        <p>{`${strings.total}: ${totalCount}`}</p>
+                        {currentLabel ? (
+                            <>
+                                <p>|</p>
+                                <p>{`${strings.searchResults}: ${currentCount}`}</p>
+                            </>
+                        ) : undefined}
+                    </div>
+                </div>
+                {/* Right Side */}
+                <div className="footer__wrap footer__right">
+                    <div>
+                        <div className="footer__right__inner">
+                            {/* Volume Slider (only if VLC is available) */}
+                            {window.External.vlcAvailable && (
+                                <>
+                                    {/* Loop button */}
+                                    <div className="footer__wrap">
+                                        <button
+                                            className={`simple-button${window.External.preferences.data.gameMusicLoop ? " simple-button--active" : ""}`}
+                                            style={{ opacity: window.External.preferences.data.gameMusicLoop ? 1 : 0.5 }}
+                                            title={`Loop: ${window.External.preferences.data.gameMusicLoop ? "On" : "Off"}`}
+                                            onClick={() => {
+                                                const newLoop = !window.External.preferences.data.gameMusicLoop;
+                                                updatePreferencesData({ gameMusicLoop: newLoop });
+                                                window.External.back.send(BackIn.SET_LOOP, newLoop);
+                                            }}>
+                                            <FontAwesomeIcon icon={faRepeat} />
+                                        </button>
+                                    </div>
+                                    {/* Autoplay button */}
+                                    <div className="footer__wrap">
+                                        <button
+                                            className={`simple-button${window.External.preferences.data.gameMusicPlay ? " simple-button--active" : ""}`}
+                                            style={{ opacity: window.External.preferences.data.gameMusicPlay ? 1 : 0.5 }}
+                                            title={`Autoplay: ${window.External.preferences.data.gameMusicPlay ? "On" : "Off"}`}
+                                            onClick={() => {
+                                                updatePreferencesData({ gameMusicPlay: !window.External.preferences.data.gameMusicPlay });
+                                            }}>
+                                            <FontAwesomeIcon icon={faForward} />
+                                        </button>
+                                    </div>
+                                    <div className="footer__wrap footer__scale-slider">
+                                        <div className="footer__scale-slider__inner">
+                                            <div className="footer__scale-slider__icon footer__scale-slider__icon--left simple-center">
+                                                <div>🔈</div>
+                                            </div>
+                                            <div className="footer__scale-slider__icon footer__scale-slider__icon--center simple-center" />
+                                            <div className="footer__scale-slider__icon footer__scale-slider__icon--right simple-center">
+                                                <div>🔊</div>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                className="footer__scale-slider__input hidden-slider"
+                                                value={window.External.preferences.data.gameMusicVolume * 100}
+                                                min={0}
+                                                max={100}
+                                                onChange={this.onVolumeSliderChange}
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* Volume Slider Percent */}
+                                    <div className="footer__wrap footer__scale-percent">
+                                        <p>
+                                            {Math.round(window.External.preferences.data.gameMusicVolume * 100)}%
+                                        </p>
+                                    </div>
+                                    {/* Play/Stop button */}
+                                    <div className="footer__wrap">
+                                        <button
+                                            className="simple-button"
+                                            disabled={!hasMusicPath}
+                                            title={hasMusicPath ? (isMusicPlaying ? "Stop music" : "Play music") : "No music available for this game"}
+                                            onClick={() => {
+                                                if (isMusicPlaying) {
+                                                    onStopMusic();
+                                                } else {
+                                                    onPlayMusic();
+                                                }
+                                            }}>
+                                            <FontAwesomeIcon icon={isMusicPlaying ? faStop : faPlay} />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                            {/* Layout Selector */}
+                            <div className="footer__wrap footer__layout-buttons">
+                                <button
+                                    className={`simple-button${layout === BrowsePageLayout.list ? " simple-button--active" : ""}`}
+                                    style={{ opacity: layout === BrowsePageLayout.list ? 1 : 0.5 }}
+                                    title="List view"
+                                    onClick={() => this.props.onLayoutChange?.(BrowsePageLayout.list)}
+                                >
+                                    <FontAwesomeIcon icon={faList} />
+                                </button>
+                                <button
+                                    className={`simple-button${layout === BrowsePageLayout.grid ? " simple-button--active" : ""}`}
+                                    style={{ opacity: layout === BrowsePageLayout.grid ? 1 : 0.5 }}
+                                    title="Grid view"
+                                    onClick={() => this.props.onLayoutChange?.(BrowsePageLayout.grid)}
+                                >
+                                    <FontAwesomeIcon icon={faBorderAll} />
+                                </button>
+                            </div>
+                            {/* Scale Slider */}
+                            <div className="footer__wrap footer__scale-slider">
+                                <div className="footer__scale-slider__inner">
+                                    <div className="footer__scale-slider__icon footer__scale-slider__icon--left simple-center">
+                                        <div>-</div>
+                                    </div>
+                                    <div className="footer__scale-slider__icon footer__scale-slider__icon--center simple-center" />
+                                    <div className="footer__scale-slider__icon footer__scale-slider__icon--right simple-center">
+                                        <div>+</div>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        className="footer__scale-slider__input hidden-slider"
+                                        value={scale * Footer.scaleSliderMax}
+                                        min={0}
+                                        max={Footer.scaleSliderMax}
+                                        ref={this.scaleSliderRef}
+                                        onChange={this.onScaleSliderChange}
+                                    />
+                                </div>
+                            </div>
+                            {/* Slider Percent */}
+                            <div className="footer__wrap footer__scale-percent">
+                                <p>
+                                    {Math.round(
+                                        100 +
+                                        (scale - 0.5) * 200 * gameScaleSpan
+                                    )}
+                                    %
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    onVolumeSliderChange = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ): void => {
+        setVolThrottle(Coerce.num(event.currentTarget.value));
+    };
+
+    onScaleSliderChange = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ): void => {
+        this.scaleSliderChange(event.target);
+    };
+
+    onGlobalKeydown = (event: KeyboardEvent): void => {
+        const scaleDif = 0.1; // How much the scale should change per increase/decrease
+        // Increase Game Scale (CTRL PLUS)
+        if (event.ctrlKey && event.key === "+") {
+            const scale = this.props.preferencesData.browsePageGameScale;
+            this.setScaleSliderValue(scale + scaleDif);
+            event.preventDefault();
+        }
+        // Decrease Game Scale (CTRL MINUS)
+        if (event.ctrlKey && event.key === "-") {
+            const scale = this.props.preferencesData.browsePageGameScale;
+            this.setScaleSliderValue(scale - scaleDif);
+            event.preventDefault();
+        }
+    };
+
+    /**
+     * Call this after the scale slider element has changed value.
+     * @param element Scale slider element.
+     */
+    scaleSliderChange(element: HTMLInputElement): void {
+        if (this.props.onScaleSliderChange) {
+            this.props.onScaleSliderChange(
+                element.valueAsNumber / Footer.scaleSliderMax
+            );
+        }
+    }
+
+
+    /**
+     * Set the value of the scale slider.
+     * @param scale Value (between 0 and 1).
+     */
+    setScaleSliderValue(scale: number): void {
+        if (this.scaleSliderRef.current) {
+            const value =
+                Math.min(Math.max(0, scale), 1) * Footer.scaleSliderMax;
+            this.scaleSliderRef.current.value = value + "";
+            this.scaleSliderChange(this.scaleSliderRef.current);
+        }
+    }
+}
+
+const setVol = (vol: number) => {
+    updatePreferencesData({
+        gameMusicVolume: vol / 100
+    });
+    window.External.back.send(BackIn.SET_VOLUME, vol / 100);
+};
+
+const setVolThrottle = throttle(setVol, 50);

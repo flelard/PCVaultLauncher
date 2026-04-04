@@ -1,0 +1,84 @@
+import * as React from "react";
+import { useState } from "react";
+import {
+    BackIn,
+    RandomGamesData,
+    RandomGamesResponseData,
+} from "@shared/back/types";
+import { IGameInfo } from "@shared/game/interfaces";
+import { findElementAncestor, getGameThumbnailUrl } from "../Util";
+import { GameGridItem } from "./GameGridItem";
+import { GameItemContainer } from "./GameItemContainer";
+
+type RandomGamesProps = {
+    onLaunchGame: (gameId: string) => void;
+};
+
+/** A small "grid" of randomly selected games. */
+export function RandomGames(props: RandomGamesProps) {
+    const { onLaunchGame: onLaunchGameProp } = props;
+    const [games, setGames] = useState<IGameInfo[]>([]);
+
+    React.useEffect(() => {
+        window.External.back.send<RandomGamesResponseData, RandomGamesData>(
+            BackIn.RANDOM_GAMES,
+            {
+                count: 5,
+            },
+            (res) => {
+                if (res.data) {
+                    setGames(res.data);
+                }
+            }
+        );
+    }, []);
+
+    const onLaunchGame = React.useCallback(
+        (_event: React.MouseEvent, gameId: string) => {
+            onLaunchGameProp(gameId);
+        },
+        [onLaunchGameProp]
+    );
+
+    const gameItems = React.useMemo(
+        () =>
+            games.map((game) => (
+                <GameGridItem
+                    key={game.id}
+                    id={game.id}
+                    title={game.title}
+                    platform={game.platform}
+                    thumbnail={getGameThumbnailUrl(game.thumbnailPath)}
+                    isSelected={false}
+                    isDragged={false}
+                    isInstalled={false}
+                />
+            )),
+        [games]
+    );
+
+    return (
+        <GameItemContainer
+            className="random-games"
+            onGameLaunch={onLaunchGame}
+            findGameId={findGameId}
+        >
+            {gameItems}
+        </GameItemContainer>
+    );
+}
+
+/**
+ * Try getting a game ID by checking an element and all of its ancestors.
+ * @param element Element or sub-element of a game.
+ */
+function findGameId(element: EventTarget): string | undefined {
+    const game = findElementAncestor(
+        element as Element,
+        (target) => GameGridItem.isElement(target),
+        true
+    );
+    if (game) {
+        return GameGridItem.getId(game);
+    }
+}

@@ -1,0 +1,568 @@
+import {
+    AdvancedFilter,
+    setAdvancedFilter,
+    setOrderBy,
+    setOrderReverse,
+    setSearchText,
+} from "@renderer/redux/searchSlice";
+import { RootState } from "@renderer/redux/store";
+import { updatePreferencesData } from "@shared/preferences/util";
+import { faCheck, faCirclePlay, faFilter, faFilterCircleXmark, faStar, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { GameOrderBy, GameOrderReverse } from "@shared/order/interfaces";
+import * as React from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { GameOrder } from "./GameOrder";
+import { OpenIcon } from "./OpenIcon";
+import {
+    ArrowKeyStepper,
+    AutoSizer,
+    List,
+    ListRowProps,
+} from "react-virtualized";
+
+export type SearchBarProps = {
+    view: string;
+};
+
+export function SearchBar(props: SearchBarProps) {
+    const { searchState } = useSelector((state: RootState) => state);
+    const dispatch = useDispatch();
+    const [expanded, setExpanded] = React.useState(
+        window.External.preferences.data.browsePageFiltersExpanded
+    );
+
+    const onToggleExpanded = () => {
+        const next = !expanded;
+        setExpanded(next);
+        updatePreferencesData({ browsePageFiltersExpanded: next });
+    };
+    const view = searchState.views[props.view];
+
+    const onTextChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        dispatch(
+            setSearchText({
+                view: props.view,
+                text: event.target.value,
+            })
+        );
+    };
+
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+    const onKeypress = (event: KeyboardEvent) => {
+        if (event.ctrlKey && event.code === "KeyF") {
+            const element = searchInputRef.current;
+            if (element) {
+                element.select();
+                event.preventDefault();
+            }
+        }
+    };
+
+    const onChangeOrderBy = (value: GameOrderBy) => {
+        dispatch(setOrderBy({ view: props.view, value }));
+        updatePreferencesData({ browsePageSearchOrderBy: value });
+    };
+
+    const onChangeOrderReverse = (value: GameOrderReverse) => {
+        dispatch(setOrderReverse({ view: props.view, value }));
+        updatePreferencesData({ browsePageSearchOrderReverse: value });
+    };
+
+    React.useEffect(() => {
+        window.addEventListener("keypress", onKeypress);
+
+        return () => {
+            window.removeEventListener("keypress", onKeypress);
+        };
+    }, []);
+
+    const onInstalledChange = (value?: boolean) => {
+        dispatch(setAdvancedFilter({ view: props.view, filter: { ...view.advancedFilter, installed: value } }));
+        updatePreferencesData({ browsePageSearchInstalled: value === undefined ? null : value });
+    };
+
+    const onRecommendedChange = (value?: boolean) => {
+        dispatch(setAdvancedFilter({ view: props.view, filter: { ...view.advancedFilter, recommended: value } }));
+        updatePreferencesData({ browsePageSearchRecommended: value === undefined ? null : value });
+    };
+
+    const hasActiveFilters =
+        view.text !== "" ||
+        view.advancedFilter.installed !== undefined ||
+        view.advancedFilter.recommended !== undefined ||
+        view.advancedFilter.developer.length > 0 ||
+        view.advancedFilter.publisher.length > 0 ||
+        view.advancedFilter.series.length > 0 ||
+        view.advancedFilter.genre.length > 0 ||
+        view.advancedFilter.playMode.length > 0 ||
+        view.advancedFilter.region.length > 0 ||
+        view.advancedFilter.rating.length > 0 ||
+        view.advancedFilter.releaseYear.length > 0;
+
+    const onClearAllFilters = () => {
+        dispatch(setSearchText({ view: props.view, text: "" }));
+        dispatch(setAdvancedFilter({
+            view: props.view,
+            filter: {
+                series: [], developer: [], publisher: [], genre: [],
+                playMode: [], region: [], releaseYear: [], rating: [],
+                installed: undefined, recommended: undefined,
+            },
+        }));
+        updatePreferencesData({ browsePageSearchInstalled: null, browsePageSearchRecommended: null });
+    };
+
+    const onToggleFactory = (key: keyof AdvancedFilter) => {
+        return (value: string) => {
+            let newValues = [...(view.advancedFilter[key] as string[])];
+            const idx = newValues.findIndex((s) => s === value);
+            if (idx > -1) {
+                newValues.splice(idx, 1);
+            } else {
+                // None is mutually exclusive to every other value
+                if (value === "") {
+                    newValues = [value];
+                } else {
+                    const noneIdx = newValues.findIndex((s) => s === "");
+                    if (noneIdx > -1) {
+                        newValues.splice(noneIdx, 1);
+                    }
+                    newValues.push(value);
+                }
+            }
+
+            dispatch(
+                setAdvancedFilter({
+                    view: props.view,
+                    filter: {
+                        ...view.advancedFilter,
+                        [key]: newValues,
+                    },
+                })
+            );
+        };
+    };
+
+    const onClearFactory = (key: keyof AdvancedFilter) => {
+        return () => {
+            dispatch(
+                setAdvancedFilter({
+                    view: props.view,
+                    filter: {
+                        ...view.advancedFilter,
+                        [key]: [],
+                    },
+                })
+            );
+        };
+    };
+
+    // Developer
+    const developerItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) =>
+                g.developer.split(";").map((s) => s.trim())
+            )
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleDeveloper = onToggleFactory("developer");
+    const onClearDeveloper = onClearFactory("developer");
+
+    // Publisher
+    const publisherItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) =>
+                g.publisher.split(";").map((s) => s.trim())
+            )
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onTogglePublisher = onToggleFactory("publisher");
+    const onClearPublisher = onClearFactory("publisher");
+
+    // Series
+    const seriesItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) => g.series.split(";").map((s) => s.trim()))
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleSeries = onToggleFactory("series");
+    const onClearSeries = onClearFactory("series");
+
+    // Genre
+    const genreItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) => g.genre.split(";").map((s) => s.trim()))
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleGenre = onToggleFactory("genre");
+    const onClearGenre = onClearFactory("genre");
+
+    // Play Mode
+    const playModeItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) =>
+                g.playMode.split(";").map((s) => s.trim())
+            )
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onTogglePlayMode = onToggleFactory("playMode");
+    const onClearPlayMode = onClearFactory("playMode");
+
+    // Region
+    const regionItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) => g.region.split(";").map((s) => s.trim()))
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleRegion = onToggleFactory("region");
+    const onClearRegion = onClearFactory("region");
+
+    // ReleaseYear
+    const releaseYearItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) => {
+                return g.releaseYear.split("-")?.[0] ?? null;
+            })
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleReleaseYear = onToggleFactory("releaseYear");
+    const onClearReleaseYear = onClearFactory("releaseYear");
+
+    // Rating
+    const ratingItems = React.useMemo(() => {
+        const set = new Set(
+            view.games.flatMap((g) => g.rating.split(";").map((s) => s.trim()))
+        );
+        return Array.from(set).sort();
+    }, [view.games]);
+    const onToggleRating = onToggleFactory("rating");
+    const onClearRating = onClearFactory("rating");
+
+    return (
+        <div
+            className={`search-bar-wrapper ${
+                expanded ? "search-bar-wrapper--expanded-simple" : ""
+            }`}
+        >
+            <div className="search-bar">
+                <div className="search-bar-icon">
+                    <OpenIcon icon="magnifying-glass" />
+                </div>
+                <input
+                    ref={searchInputRef}
+                    placeholder="Search"
+                    className="search-bar-text-input"
+                    value={view.text}
+                    onChange={onTextChange}
+                />
+                <GameOrder
+                    orderBy={view.orderBy}
+                    orderReverse={view.orderReverse}
+                    onChangeOrderBy={onChangeOrderBy}
+                    onChangeOrderReverse={onChangeOrderReverse}
+                />
+                <TriStateIconButton
+                    icon={faCirclePlay}
+                    title="Installed"
+                    value={view.advancedFilter.installed}
+                    onChange={onInstalledChange}
+                />
+                <TriStateIconButton
+                    icon={faStar}
+                    title="Recommended"
+                    value={view.advancedFilter.recommended}
+                    onChange={onRecommendedChange}
+                />
+                <button
+                    className="simple-button"
+                    onClick={onClearAllFilters}
+                    disabled={!hasActiveFilters}
+                    title="Clear all filters"
+                >
+                    <FontAwesomeIcon icon={faFilterCircleXmark} />
+                </button>
+                <button
+                    className={`simple-button${expanded ? " simple-button--active" : ""}`}
+                    onClick={onToggleExpanded}
+                    title={expanded ? "Hide filters" : "Show filters"}
+                >
+                    <FontAwesomeIcon icon={faFilter} />
+                </button>
+            </div>
+            {expanded && (
+                <div className="search-bar-expansion search-bar-expansion-simple">
+                    <SearchableSelect
+                        title="Developer"
+                        onToggle={onToggleDeveloper}
+                        onClear={onClearDeveloper}
+                        selected={view.advancedFilter.developer}
+                        items={developerItems}
+                    />
+                    <SearchableSelect
+                        title="Publisher"
+                        onToggle={onTogglePublisher}
+                        onClear={onClearPublisher}
+                        selected={view.advancedFilter.publisher}
+                        items={publisherItems}
+                    />
+                    <SearchableSelect
+                        title="Series"
+                        onToggle={onToggleSeries}
+                        onClear={onClearSeries}
+                        selected={view.advancedFilter.series}
+                        items={seriesItems}
+                    />
+                    <SearchableSelect
+                        title="Genre"
+                        onToggle={onToggleGenre}
+                        onClear={onClearGenre}
+                        selected={view.advancedFilter.genre}
+                        items={genreItems}
+                    />
+                    <SearchableSelect
+                        title="Play Mode"
+                        onToggle={onTogglePlayMode}
+                        onClear={onClearPlayMode}
+                        selected={view.advancedFilter.playMode}
+                        items={playModeItems}
+                    />
+                    <SearchableSelect
+                        title="Region"
+                        onToggle={onToggleRegion}
+                        onClear={onClearRegion}
+                        selected={view.advancedFilter.region}
+                        items={regionItems}
+                    />
+                    <SearchableSelect
+                        title="Rating"
+                        onToggle={onToggleRating}
+                        onClear={onClearRating}
+                        selected={view.advancedFilter.rating}
+                        items={ratingItems}
+                    />
+                    <SearchableSelect
+                        title="Release Year"
+                        onToggle={onToggleReleaseYear}
+                        onClear={onClearReleaseYear}
+                        selected={view.advancedFilter.releaseYear}
+                        items={releaseYearItems}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+type TriStateIconButtonProps = {
+    value?: boolean;
+    title: string;
+    icon: IconDefinition;
+    onChange: (value?: boolean) => void;
+};
+
+function TriStateIconButton({ value, title, icon, onChange }: TriStateIconButtonProps) {
+    const handleClick = () => {
+        if (value === true) {
+            onChange(false);
+        } else if (value === false) {
+            onChange(undefined);
+        } else {
+            onChange(true);
+        }
+    };
+
+    return (
+        <button
+            className={`simple-button tri-state-icon-button${value === undefined ? " tri-state-icon-button--inactive" : ""}`}
+            onClick={handleClick}
+            onContextMenu={(e) => { e.preventDefault(); onChange(undefined); }}
+            title={title}
+        >
+            <FontAwesomeIcon icon={icon} />
+            <span className={`tri-state-icon-button__indicator${value === true ? " tri-state-icon-button__indicator--check" : value === false ? " tri-state-icon-button__indicator--cross" : ""}`}>
+                {value === true && <FontAwesomeIcon icon={faCheck} />}
+                {value === false && <FontAwesomeIcon icon={faXmark} />}
+            </span>
+        </button>
+    );
+}
+
+type SearchableSelectProps = {
+    title: string;
+    items: string[];
+    selected: string[];
+    onToggle: (item: string) => void;
+    onClear: () => void;
+};
+
+function SearchableSelect(props: SearchableSelectProps) {
+    const { title, items, selected, onToggle, onClear } = props;
+    const [expanded, setExpanded] = React.useState(false);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+    const onToggleExpanded = () => {
+        setExpanded(prev => !prev);
+    };
+
+    // Close dropdown when clicking outside of it
+    const handleClickOutside = (event: any) => {
+        if (
+            dropdownRef.current &&
+            !dropdownRef.current.contains(event.target)
+        ) {
+            setExpanded(false);
+        }
+    };
+
+    React.useEffect(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    return (
+        <div
+            className="search-bar-simple-box"
+            onClick={onToggleExpanded}
+            onContextMenu={onClear}
+        >
+            <div className="searchable-select" ref={dropdownRef}>
+                <div className="searchable-select-header">
+                    <div className="searchable-select-title">{title}</div>
+                    {selected.length > 0 && (
+                        <div className="searchable-select-number">
+                            {selected.length}
+                        </div>
+                    )}
+                    <div className="searchable-select-chevron">
+                        {expanded ? (
+                            <OpenIcon icon="chevron-top" />
+                        ) : (
+                            <OpenIcon icon="chevron-bottom" />
+                        )}
+                    </div>
+                </div>
+                {expanded && (
+                    <SearchableSelectDropdown
+                        items={items}
+                        onToggle={onToggle}
+                        selected={selected}
+                    />
+                )}
+            </div>
+        </div>
+    );
+}
+
+type SearchableSelectDropdownProps = {
+    items: string[];
+    selected: string[];
+    onToggle: (item: string) => void;
+};
+
+function SearchableSelectDropdown(props: SearchableSelectDropdownProps) {
+    const { items, selected, onToggle } = props;
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    const [search, setSearch] = React.useState("");
+    const [storedItems, setStoredItems] = React.useState(items);
+
+    const filteredItems = React.useMemo(() => {
+        const lowerSearch = search.toLowerCase().replace(" ", "");
+        return storedItems.filter((item) =>
+            item.toLowerCase().replace(" ", "").includes(lowerSearch)
+        );
+    }, [search, storedItems]);
+
+    React.useEffect(() => {
+        if (selected.length === 0) {
+            setStoredItems(items);
+        }
+    }, [items, selected.length]);
+
+    const rowRenderer = (props: ListRowProps) => {
+        const { style } = props;
+        const item = filteredItems[props.index];
+
+        const marked = selected.includes(item);
+
+        return (
+            <div
+                style={style}
+                title={item ? item : "None"}
+                className={`searchable-select-dropdown-item ${
+                    marked && "searchable-select-dropdown-item--selected"
+                }`}
+                onClick={() => onToggle(item)}
+                key={item}
+            >
+                <div className="searchable-select-dropdown-item-title">
+                    {item ? item : <i>None</i>}
+                </div>
+                {marked && (
+                    <div className="searchable-select-dropdown-item-marked">
+                        <OpenIcon icon="check" />
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div
+            onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                return -1;
+            }}
+            className="searchable-select-dropdown"
+        >
+            <input
+                ref={inputRef}
+                className="searchable-select-dropdown-search-bar"
+                value={search}
+                placeholder="Search"
+                onChange={(event) => setSearch(event.currentTarget.value)}
+            />
+            <div className="searchable-select-dropdown-results">
+                <AutoSizer>
+                    {({ width, height }) => {
+                        return (
+                            <ArrowKeyStepper
+                                mode="cells"
+                                isControlled={true}
+                                columnCount={1}
+                                rowCount={filteredItems.length}
+                            >
+                                {({ onSectionRendered }) => (
+                                    <List
+                                        className="simple-scroll"
+                                        width={width}
+                                        height={height}
+                                        overscanRowCount={20}
+                                        rowCount={filteredItems.length}
+                                        rowHeight={30}
+                                        rowRenderer={rowRenderer}
+                                        onSectionRendered={onSectionRendered}
+                                    />
+                                )}
+                            </ArrowKeyStepper>
+                        );
+                    }}
+                </AutoSizer>
+            </div>
+        </div>
+    );
+}

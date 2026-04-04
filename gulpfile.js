@@ -1,0 +1,213 @@
+const fs = require("fs-extra");
+const gulp = require("gulp");
+const builder = require("electron-builder");
+const { Platform, archFromString } = require("electron-builder");
+const { exec } = require("child_process");
+const { createRsbuild, loadConfig } = require('@rsbuild/core');
+
+const packageJson = JSON.parse(fs.readFileSync("./package.json"));
+const config = {
+    buildVersion: Date.now().toString(),
+    isRelease: process.env.NODE_ENV === "production",
+    isStaticInstall: packageJson.config.installed,
+    static: {
+        src: "./static",
+        dest: "./build",
+    },
+    main: {
+        src: "./src/main",
+    },
+    sevenZip: "./extern/7zip-bin",
+    back: {
+        src: "./src/back",
+    },
+};
+
+/* ------ Watch ------ */
+
+gulp.task("build-back-dev", (done) => {
+    execute("npx swc --strip-leading-paths --no-swcrc --config-file swcrc.back.dev.json --source-maps true -d build src", done);
+});
+
+gulp.task("watch-back", (done) => {
+    gulp.watch("src/**/*.{ts,tsx}", gulp.task("build-back-dev"));
+    done();
+});
+
+gulp.task("watch-renderer", async (done) => {
+    const config = await loadConfig();
+    const rsbuild = await createRsbuild({
+      rsbuildConfig: {
+        ...config.content
+      }
+    });
+    await rsbuild.build({
+      watch: true
+    });
+    done();
+});
+
+gulp.task("watch-static", () => {
+    gulp.watch(config.static.src + "/**/*", gulp.task("copy-static"));
+});
+
+/* ------ Build ------ */
+
+gulp.task("build-back", (done) => {
+    execute("npx swc --strip-leading-paths --no-swcrc --config-file swcrc.back.prod.json -d build src", done);
+});
+
+gulp.task("build-renderer", async (done) => {
+    const config = await loadConfig();
+    const rsbuild = await createRsbuild({
+      rsbuildConfig: config.content
+    });
+    await rsbuild.build();
+    done();
+});
+
+gulp.task("copy-static", () => {
+    return gulp
+        .src(config.static.src + "/**/*", { encoding: false })
+        .pipe(gulp.dest(config.static.dest));
+});
+
+/* ------ Pack ------ */
+
+gulp.task("pack", (done) => {
+    const targets = createBuildTargets(
+        process.env.PACK_PLATFORM,
+        process.env.PACK_ARCH,
+    );
+    const publish = process.env.PUBLISH ? createPublishInfo() : []; // Uses Git repo for unpublished builds
+    const copyFiles = getCopyFiles();
+    builder
+        .build({
+            config: {
+                appId: "com.exo.exogui",
+                productName: "exogui",
+                directories: {
+                    buildResources: "./static/",
+                    output: "./dist/",
+                },
+                files: ["./build"],
+                extraFiles: copyFiles, // Files to copy to the build folder
+                compression: "store", // Only used if a compressed target (like 7z, nsis, dmg etc)
+                asar: true,
+                publish: publish,
+                linux: {
+                    publish: "github",
+                    target: ["AppImage", "tar.gz", "dir"],
+                    category: "Game",
+                    icon: "./static/icons/",
+                    executableArgs: ["--no-sandbox"],
+                    artifactName: "${productName}.${ext}",
+                },
+                win: {
+                    icon: "./icons/icon.ico",
+                    target: ["nsis", "zip"],
+                },
+                mac: {
+                    icon: "./icons/icon.icns",
+                },
+            },
+            targets: targets,
+        })
+        .then(() => {
+            console.log("Pack - Done!");
+        })
+        .catch((error) => {
+            console.log("Pack - Error!", error);
+        })
+        .then(done);
+});
+
+/* ------ Meta Tasks ------*/
+
+gulp.task(
+    "watch",
+    gulp.parallel(
+        "watch-back",
+        "watch-renderer",
+        "watch-static",
+        "copy-static",
+    ),
+);
+
+gulp.task(
+    "build",
+    gulp.parallel(
+        "build-back",
+        "build-renderer",
+        "copy-static",
+    ),
+);
+
+/* ------ Misc ------*/
+
+function execute(command, callback) {
+    const child = exec(command);
+    child.stderr.on("data", (data) => {
+        console.log(data);
+    });
+    child.stdout.on("data", (data) => {
+        console.log(data);
+    });
+    if (callback) {
+        child.once("exit", () => {
+            callback();
+        });
+    }
+}
+
+function createBuildTargets(os, arch) {
+    switch (os) {
+        case "win32":
+            return Platform.WINDOWS.createTarget(
+                ["nsis", "zip"],
+                archFromString(arch),
+            );
+        case "darwin":
+            return Platform.MAC.createTarget("dmg", archFromString(arch));
+        case "linux":
+            return Platform.LINUX.createTarget(
+                ["AppImage", "tar.gz", "dir"],
+                archFromString(arch),
+            );
+    }
+}
+
+function getCopyFiles() {
+    const files = [
+        {
+            // Only copy 7zip execs for packed platform
+            from: "./extern/7zip-bin",
+            to: "./extern/7zip-bin",
+            filter: ["${os}/**/*"],
+        },
+        "./lang",
+        "./licenses",
+        "./mappings.linux.json",
+        "./mappings.win32.json",
+        "./mappings.darwin.json",
+        "./platform_options.json",
+        {
+            from: "./LICENSE",
+            to: "./licenses/LICENSE",
+        },
+    ];
+    if (process.env.PACK_PLATFORM === "linux" && fs.existsSync("./fonts")) {
+        files.push({ from: "./fonts", to: "./fonts" });
+    }
+    return files;
+}
+
+function createPublishInfo() {
+    return [
+        {
+            provider: "github",
+            owner: "exogui",
+            repo: "exogui",
+        },
+    ];
+}

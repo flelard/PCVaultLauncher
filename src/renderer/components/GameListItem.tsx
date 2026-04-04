@@ -1,0 +1,139 @@
+import * as React from "react";
+import { ListRowProps } from "react-virtualized";
+
+export type GameListItemProps = ListRowProps & {
+    id: string;
+    title: string;
+    platform: string;
+    tags: string;
+    developer: string;
+    publisher: string;
+    releaseYear: string;
+    /** If the row can be dragged (defaults to false). */
+    isDraggable?: boolean;
+    /** If the row is selected. */
+    isSelected: boolean;
+    /** If the row is being dragged. */
+    isDragged: boolean;
+    /** If game is installed */
+    isInstalled: boolean;
+    /** If the game has background music. */
+    hasMusic?: boolean;
+};
+
+export function GameListItem(props: GameListItemProps) {
+    const {
+        id,
+        title,
+        tags: tags,
+        developer,
+        publisher,
+        releaseYear,
+        isDraggable,
+        isSelected,
+        isDragged,
+        isInstalled,
+        hasMusic,
+        index,
+        style,
+    } = props;
+    // Pick class names
+    const className = React.useMemo(() => {
+        let className: string = "game-list-item";
+        if (index % 2 === 0) {
+            className += " game-list-item--even";
+        }
+        if (isSelected) {
+            className += " game-list-item--selected";
+        }
+        if (isDragged) {
+            className += " game-list-item--dragged";
+        }
+        if (isInstalled) {
+            className += " game-list-item--installed";
+        }
+        return className;
+    }, [index, isSelected, isDragged, isInstalled]);
+    // Memoize render
+    return React.useMemo(() => {
+        // Set element attributes
+        const attributes: any = {};
+        attributes[GameListItem.idAttribute] = id;
+        // Render
+        return (
+            <li
+                style={style}
+                className={className}
+                draggable={isDraggable}
+                {...attributes}
+            >
+                <div className="game-list-item__right">
+                    <div
+                        className="game-list-item__field game-list-item__field--title"
+                        title={title}
+                    >
+                        {hasMusic && <span className="game-list-item__music-note">♪</span>}
+                        {title}
+                    </div>
+                    <div
+                        className="game-list-item__field game-list-item__field--releaseYear"
+                        title={releaseYear}
+                    >
+                        {releaseYear}
+                    </div>
+                    <div
+                        className="game-list-item__field game-list-item__field--developer"
+                        title={developer}
+                    >
+                        {developer}
+                    </div>
+                    <div
+                        className="game-list-item__field game-list-item__field--publisher"
+                        title={publisher}
+                    >
+                        {publisher}
+                    </div>
+                    <div
+                        className="game-list-item__field game-list-item__field--tags"
+                        title={tags}
+                    >
+                        {tags}
+                    </div>
+                </div>
+            </li>
+        );
+    }, [style, className, isDraggable, id, tags, title, releaseYear, developer, publisher, hasMusic]);
+}
+
+export namespace GameListItem {
+
+    /** ID of the attribute used to store the game's id. */
+    export const idAttribute: string = "data-game-id";
+
+    /**
+     * Get the id of the game displayed in a GameListItem element (or throw an error if it fails).
+     * @param element GameListItem element.
+     */
+    export function getId(element: Element): string {
+        const value = element.getAttribute(GameListItem.idAttribute);
+        if (typeof value !== "string") {
+            throw new Error(
+                "Failed to get ID from GameListItem element. Attribute not found.",
+            );
+        }
+        return value;
+    }
+
+    /**
+     * Check if an element is the top element of GameListItem or not.
+     * @param element Potential element to check.
+     */
+    export function isElement(element: Element | null | undefined): boolean {
+        if (element) {
+            const value = element.getAttribute(GameListItem.idAttribute);
+            return typeof value === "string";
+        } else {
+            return false;
+        }
+    }
+}

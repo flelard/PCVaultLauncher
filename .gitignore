@@ -1,0 +1,31 @@
+# Node/NPM
+node_modules
+npm-debug.log.*
+
+# Visual Studio Code
+/.vscode
+
+# Build
+/build
+
+# Distribution
+/dist
+
+# Temp
+/temp
+
+# Launcher files (created during testing)
+/config.json
+/preferences.json
+/.installed
+/.version
+/secret.txt
+/launcher.log
+
+# Jest related files
+/.coveralls.yml
+/coverage
+/tests/result
+
+# AI engines
+CLAUDE.md
