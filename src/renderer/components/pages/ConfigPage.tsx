@@ -282,6 +282,27 @@ export class ConfigPage extends React.Component<ConfigPageProps, ConfigPageState
                                         />
                                     </div>
                                 </div>
+                                <div className="cfg-row cfg-row--filepath">
+                                    <div className="cfg-row__label">
+                                        <span className="cfg-row__name">Media Directory</span>
+                                        <span className="cfg-row__desc">Base folder for FlatImage images and videos (must contain Images/ and Videos/ subfolders). Leave empty to use the eXoDOS path.</span>
+                                    </div>
+                                    <div className="cfg-row__control cfg-row__control--wide">
+                                        <div className="exodos-path__input">
+                                            <input
+                                                type="text"
+                                                value={this.state.flatimage.mediaDirectory}
+                                                onChange={(e) => this.onFlatImageMediaDirectoryChange(e.target.value)}
+                                            />
+                                        </div>
+                                        <input
+                                            type="button"
+                                            value="Browse"
+                                            className="simple-button"
+                                            onClick={this.onFlatImageMediaBrowseClick}
+                                        />
+                                    </div>
+                                </div>
                                 <div className="cfg-row">
                                     <div className="cfg-row__label">
                                         <span className="cfg-row__name">Auto-detect on Startup</span>
@@ -382,6 +403,20 @@ export class ConfigPage extends React.Component<ConfigPageProps, ConfigPageState
 
     onFlatImageAutoDetectChange = (isChecked: boolean): void => {
         this.setState({ flatimage: { ...this.state.flatimage, autoDetect: isChecked } });
+    };
+
+    onFlatImageMediaDirectoryChange = (value: string): void => {
+        this.setState({ flatimage: { ...this.state.flatimage, mediaDirectory: value } });
+    };
+
+    onFlatImageMediaBrowseClick = (): void => {
+        const filePaths = window.External.showOpenDialogSync({
+            title: "Select the media base directory",
+            properties: ["openDirectory"],
+        });
+        if (filePaths) {
+            this.onFlatImageMediaDirectoryChange(filePaths[0]);
+        }
     };
 
     onFlatImageBrowseClick = (): void => {

@@ -33,6 +33,7 @@ const configDataDefaultBase: Readonly<IAppConfigData> = Object.freeze({
         flatimageDirectory: "",
         autoDetect: false,
         metadataCache: true,
+        mediaDirectory: "",
     },
 });
 
@@ -125,6 +126,7 @@ export function overwriteConfigData(
             if (typeof fi.flatimageDirectory === "string") { source.flatimage.flatimageDirectory = parseVarStr(str(fi.flatimageDirectory)); }
             if (typeof fi.autoDetect === "boolean") { source.flatimage.autoDetect = fi.autoDetect; }
             if (typeof fi.metadataCache === "boolean") { source.flatimage.metadataCache = fi.metadataCache; }
+            if (typeof fi.mediaDirectory === "string") { source.flatimage.mediaDirectory = parseVarStr(str(fi.mediaDirectory)); }
         }
     }, true);
     // Do some alterations

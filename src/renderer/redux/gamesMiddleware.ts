@@ -95,8 +95,10 @@ export function addGamesMiddleware() {
                         const flatimageStart = Date.now();
                         const flatimageCollection = scanFlatImageDirectory(flatimageConfig.flatimageDirectory);
                         if (flatimageCollection.games.length > 0) {
-                            const images = await loadPlatformImages("Flatimage");
-                            const videos = loadPlatformVideos("Flatimage");
+                            const mediaBase = flatimageConfig.mediaDirectory || undefined;
+                            const imagesBase = mediaBase ? path.join(mediaBase, "Images") : undefined;
+                            const images = await loadPlatformImages("Flatimage", imagesBase);
+                            const videos = loadPlatformVideos("Flatimage", mediaBase);
                             for (const game of flatimageCollection.games) {
                                 mapGamesMedia(game, images, videos);
                             }

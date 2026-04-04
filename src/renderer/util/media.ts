@@ -12,8 +12,8 @@ import { updateGame } from "@renderer/redux/gamesSlice";
 import { getGameByTitle } from "./games";
 import store from "@renderer/redux/store";
 
-export function loadPlatformVideos(platform: string): GameVideosCollection {
-    const videosPath = getPlatformVideosPath(platform);
+export function loadPlatformVideos(platform: string, basePath?: string): GameVideosCollection {
+    const videosPath = getPlatformVideosPath(platform, basePath);
     const videos: GameVideosCollection = {};
 
     if (fs.existsSync(videosPath)) {
@@ -119,13 +119,14 @@ function getImagesFromCollection(
 
 // Finds a list of all game images, returned in a map where the key is the type of image, and the value is an array of filenames
 export async function loadPlatformImages(
-    platform: string
+    platform: string,
+    basePath?: string
 ): Promise<GameImagesCollection> {
-    const platformImagesPath = path.join(
+    const base = basePath ?? path.join(
         window.External.config.fullExodosPath,
-        window.External.config.data.imageFolderPath,
-        platform
+        window.External.config.data.imageFolderPath
     );
+    const platformImagesPath = path.join(base, platform);
     const collection: GameImagesCollection = {};
 
     if (fs.existsSync(platformImagesPath)) {
@@ -251,6 +252,7 @@ export function createVideosWatcher(platform: string): chokidar.FSWatcher {
     return watcher;
 }
 
-function getPlatformVideosPath(platform: string) {
-    return path.join(window.External.config.fullExodosPath, "Videos", platform);
+function getPlatformVideosPath(platform: string, basePath?: string) {
+    const base = basePath ?? window.External.config.fullExodosPath;
+    return path.join(base, "Videos", platform);
 }

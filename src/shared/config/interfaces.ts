@@ -3,6 +3,8 @@ export type IFlatImageConfig = {
     flatimageDirectory: string;
     autoDetect: boolean;
     metadataCache: boolean;
+    /** Base directory for FlatImage media (Images/ and Videos/ subfolders). If empty, falls back to exodosPath. */
+    mediaDirectory: string;
 };
 
 /** Data contained in the Config file */
