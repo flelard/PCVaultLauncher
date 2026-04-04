@@ -58,9 +58,15 @@ export function addGamesMiddleware() {
                     console.warn(`[WARN] Platforms.xml not found or unreadable — eXoDOS games will not be loaded. (${err})`);
                 }
 
-                const totalPlatforms = platforms.length;
-                for (let i = 0; i < platforms.length; i++) {
-                    const platform = platforms[i];
+                // When FlatImage support is enabled, exclude the "Flatimage" platform from
+                // the eXoDOS loader — it is handled by the FlatImage scanner instead.
+                const flatimageEnabled = window.External.config.data.flatimage?.enabled;
+                const exodosPlatforms = flatimageEnabled
+                    ? platforms.filter(p => p.toLowerCase() !== "flatimage")
+                    : platforms;
+                const totalPlatforms = exodosPlatforms.length;
+                for (let i = 0; i < exodosPlatforms.length; i++) {
+                    const platform = exodosPlatforms[i];
                     listenerApi.dispatch(setPlatformLoadingProgress({
                         currentIndex: i + 1,
                         total: totalPlatforms,
