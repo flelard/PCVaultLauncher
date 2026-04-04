@@ -10,7 +10,7 @@ import {
     padStart,
     stringifyArray,
 } from "@shared/Util";
-import { ChildProcess, exec } from "child_process";
+import { ChildProcess, exec, spawn } from "child_process";
 import { EventEmitter } from "events";
 import * as path from "path";
 
@@ -167,6 +167,21 @@ export namespace GameLauncher {
             opts.execMappings,
             opts.native
         );
+
+        // FlatImage executables must run as fully detached processes (like AppImages).
+        // Using exec() can interfere with their namespace/FUSE setup.
+        if (opts.game.platform === "Flatimage") {
+            const cwd = path.dirname(gamePath);
+            const proc = spawn(gamePath, [], {
+                detached: true,
+                stdio: "ignore",
+                cwd,
+                env: process.env,
+            });
+            proc.unref();
+            log(logSource, `Launch FlatImage "${opts.game.title}" (PID: ${proc.pid}) [ path: "${gamePath}" ]`);
+            return;
+        }
 
         let command: Command;
         try {
