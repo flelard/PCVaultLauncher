@@ -33,7 +33,8 @@ const configDataDefaultBase: Readonly<IAppConfigData> = Object.freeze({
         flatimageDirectory: "",
         autoDetect: false,
         metadataCache: true,
-        mediaDirectory: "",
+        imagesDirectory: "",
+        videosDirectory: "",
     },
 });
 
@@ -126,7 +127,8 @@ export function overwriteConfigData(
             if (typeof fi.flatimageDirectory === "string") { source.flatimage.flatimageDirectory = parseVarStr(str(fi.flatimageDirectory)); }
             if (typeof fi.autoDetect === "boolean") { source.flatimage.autoDetect = fi.autoDetect; }
             if (typeof fi.metadataCache === "boolean") { source.flatimage.metadataCache = fi.metadataCache; }
-            if (typeof fi.mediaDirectory === "string") { source.flatimage.mediaDirectory = parseVarStr(str(fi.mediaDirectory)); }
+            if (typeof fi.imagesDirectory === "string") { source.flatimage.imagesDirectory = parseVarStr(str(fi.imagesDirectory)); }
+            if (typeof fi.videosDirectory === "string") { source.flatimage.videosDirectory = parseVarStr(str(fi.videosDirectory)); }
         }
     }, true);
     // Do some alterations

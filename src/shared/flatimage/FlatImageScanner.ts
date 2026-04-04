@@ -22,6 +22,18 @@ function deterministicId(filename: string): string {
 }
 
 /**
+ * Converts a raw filename into a readable game title.
+ * e.g. "my_game-title" → "My Game Title"
+ */
+function cleanTitle(filename: string): string {
+    return filename
+        .replace(/[._-]/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase())
+        .trim();
+}
+
+/**
  * Scans a directory for .flatimage files and returns a game collection.
  */
 export function scanFlatImageDirectory(directory: string): IGameCollection {
@@ -59,7 +71,8 @@ export function scanFlatImageDirectory(directory: string): IGameCollection {
             // Non-fatal: proceed even if chmod fails
         }
 
-        const title = entry.slice(0, -".flatimage".length);
+        const rawTitle = entry.slice(0, -".flatimage".length);
+        const title = cleanTitle(rawTitle);
         const game: IGameInfo = {
             id: deterministicId(entry),
             title,

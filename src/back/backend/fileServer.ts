@@ -72,32 +72,54 @@ export class FileServer {
                 // Image folder
                 case "images":
                     {
-                        const imageFolder = path.join(
-                            this._config.exodosPath,
-                            this._config.imageFolderPath
-                        );
-                        const filePath = path.join(
-                            imageFolder,
-                            urlPath.substr(index + 1)
-                        );
-                        if (filePath.startsWith(imageFolder)) {
-                            this._serveFile(req, res, filePath);
+                        const remainder = urlPath.substr(index + 1);
+                        const fi = this._config.flatimage;
+                        if (
+                            remainder.toLowerCase().startsWith("flatimage/") &&
+                            fi?.enabled && fi.imagesDirectory
+                        ) {
+                            // Serve FlatImage images from custom directory
+                            const relative = remainder.substr("Flatimage/".length);
+                            const filePath = path.join(fi.imagesDirectory, relative);
+                            if (filePath.startsWith(fi.imagesDirectory)) {
+                                this._serveFile(req, res, filePath);
+                            }
+                        } else {
+                            const imageFolder = path.join(
+                                this._config.exodosPath,
+                                this._config.imageFolderPath
+                            );
+                            const filePath = path.join(imageFolder, remainder);
+                            if (filePath.startsWith(imageFolder)) {
+                                this._serveFile(req, res, filePath);
+                            }
                         }
                     }
                     break;
 
                 case "videos":
                     {
-                        const videosFolder = path.join(
-                            this._config.exodosPath,
-                            "Videos"
-                        );
-                        const filePath = path.join(
-                            videosFolder,
-                            urlPath.substring(index + 1)
-                        );
-                        if (filePath.startsWith(videosFolder)) {
-                            this._serveFile(req, res, filePath);
+                        const remainder = urlPath.substring(index + 1);
+                        const fi = this._config.flatimage;
+                        if (
+                            remainder.toLowerCase().startsWith("flatimage/") &&
+                            fi?.enabled && fi.videosDirectory
+                        ) {
+                            // Serve FlatImage videos from custom directory
+                            const relative = remainder.substr("Flatimage/".length);
+                            const filePath = path.join(fi.videosDirectory, relative);
+                            if (filePath.startsWith(fi.videosDirectory)) {
+                                this._serveFile(req, res, filePath);
+                            }
+                        } else {
+                            const videosFolder = path.join(
+                                this._config.exodosPath,
+                                "Videos"
+                            );
+                            const filePath = path.join(videosFolder, remainder);
+                            if (filePath.startsWith(videosFolder)) {
+                                this._serveFile(req, res, filePath);
+                            }
                         }
                     }
                     break;

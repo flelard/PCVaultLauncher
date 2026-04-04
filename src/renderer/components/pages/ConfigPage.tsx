@@ -284,22 +284,43 @@ export class ConfigPage extends React.Component<ConfigPageProps, ConfigPageState
                                 </div>
                                 <div className="cfg-row cfg-row--filepath">
                                     <div className="cfg-row__label">
-                                        <span className="cfg-row__name">Media Directory</span>
-                                        <span className="cfg-row__desc">Base folder for FlatImage images and videos (must contain Images/ and Videos/ subfolders). Leave empty to use the eXoDOS path.</span>
+                                        <span className="cfg-row__name">Images Directory</span>
+                                        <span className="cfg-row__desc">Path to the Images/Flatimage/ folder. Leave empty to use the eXoDOS path.</span>
                                     </div>
                                     <div className="cfg-row__control cfg-row__control--wide">
                                         <div className="exodos-path__input">
                                             <input
                                                 type="text"
-                                                value={this.state.flatimage.mediaDirectory}
-                                                onChange={(e) => this.onFlatImageMediaDirectoryChange(e.target.value)}
+                                                value={this.state.flatimage.imagesDirectory}
+                                                onChange={(e) => this.onFlatImageImagesDirectoryChange(e.target.value)}
                                             />
                                         </div>
                                         <input
                                             type="button"
                                             value="Browse"
                                             className="simple-button"
-                                            onClick={this.onFlatImageMediaBrowseClick}
+                                            onClick={this.onFlatImageImagesBrowseClick}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="cfg-row cfg-row--filepath">
+                                    <div className="cfg-row__label">
+                                        <span className="cfg-row__name">Videos Directory</span>
+                                        <span className="cfg-row__desc">Path to the Videos/Flatimage/ folder. Leave empty to use the eXoDOS path.</span>
+                                    </div>
+                                    <div className="cfg-row__control cfg-row__control--wide">
+                                        <div className="exodos-path__input">
+                                            <input
+                                                type="text"
+                                                value={this.state.flatimage.videosDirectory}
+                                                onChange={(e) => this.onFlatImageVideosDirectoryChange(e.target.value)}
+                                            />
+                                        </div>
+                                        <input
+                                            type="button"
+                                            value="Browse"
+                                            className="simple-button"
+                                            onClick={this.onFlatImageVideosBrowseClick}
                                         />
                                     </div>
                                 </div>
@@ -405,17 +426,31 @@ export class ConfigPage extends React.Component<ConfigPageProps, ConfigPageState
         this.setState({ flatimage: { ...this.state.flatimage, autoDetect: isChecked } });
     };
 
-    onFlatImageMediaDirectoryChange = (value: string): void => {
-        this.setState({ flatimage: { ...this.state.flatimage, mediaDirectory: value } });
+    onFlatImageImagesDirectoryChange = (value: string): void => {
+        this.setState({ flatimage: { ...this.state.flatimage, imagesDirectory: value } });
     };
 
-    onFlatImageMediaBrowseClick = (): void => {
+    onFlatImageImagesBrowseClick = (): void => {
         const filePaths = window.External.showOpenDialogSync({
-            title: "Select the media base directory",
+            title: "Select the Images/Flatimage/ directory",
             properties: ["openDirectory"],
         });
         if (filePaths) {
-            this.onFlatImageMediaDirectoryChange(filePaths[0]);
+            this.onFlatImageImagesDirectoryChange(filePaths[0]);
+        }
+    };
+
+    onFlatImageVideosDirectoryChange = (value: string): void => {
+        this.setState({ flatimage: { ...this.state.flatimage, videosDirectory: value } });
+    };
+
+    onFlatImageVideosBrowseClick = (): void => {
+        const filePaths = window.External.showOpenDialogSync({
+            title: "Select the Videos/Flatimage/ directory",
+            properties: ["openDirectory"],
+        });
+        if (filePaths) {
+            this.onFlatImageVideosDirectoryChange(filePaths[0]);
         }
     };
 
