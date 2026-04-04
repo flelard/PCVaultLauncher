@@ -173,7 +173,9 @@ export namespace GameLauncher {
         // No cwd/env override — let the FlatImage manage its own environment.
         if (opts.game.platform === "Flatimage") {
             if (!fs.existsSync(gamePath)) {
-                log(logSource, `[ERROR] FlatImage not found: "${gamePath}"`);
+                const msg = `[ERROR] FlatImage not found: "${gamePath}"`;
+                log(logSource, msg);
+                console.error(msg);
                 return;
             }
             try {
@@ -191,13 +193,17 @@ export namespace GameLauncher {
                 proc.stderr.on("data", (d: Buffer) => chunks.push(d.toString()));
                 setTimeout(() => {
                     if (chunks.length > 0) {
-                        log(logSource, `[FlatImage stderr] "${opts.game.title}": ${chunks.join("")}`);
+                        const msg = `[FlatImage stderr] "${opts.game.title}": ${chunks.join("")}`;
+                        log(logSource, msg);
+                        console.error(msg);
                     }
                 }, 3000);
             }
 
             proc.on("error", (err) => {
-                log(logSource, `[ERROR] Failed to spawn FlatImage "${opts.game.title}": ${err.message}`);
+                const msg = `[ERROR] Failed to spawn FlatImage "${opts.game.title}": ${err.message}`;
+                log(logSource, msg);
+                console.error(msg);
             });
 
             proc.unref();
