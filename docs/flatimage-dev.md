@@ -16,10 +16,10 @@ FlatImage (`.flatimage` files) are portable Linux game executables — similar t
 | `src/shared/config/interfaces.ts` | `IFlatImageConfig` type definition |
 | `src/shared/config/util.ts` | Default values + parsing for `flatimage` config key |
 | `src/renderer/redux/gamesMiddleware.ts` | Loads FlatImage games on startup, after eXoDOS platforms |
-| `src/renderer/util/media.ts` | `loadPlatformImages(platform, basePath?)` / `loadPlatformVideos(platform, basePath?)` |
+| `src/renderer/util/media.ts` | `loadPlatformImages(platform, directPath?)` / `loadPlatformVideos(platform, directPath?)` |
 | `src/renderer/components/pages/ConfigPage.tsx` | UI for FlatImage config section |
-| `src/back/game/GameLauncher.ts` | Special detached spawn for Flatimage platform |
-| `mappings.linux.json` | Contains `flatimage` extension entry (direct execution, setCwdToFileDir) |
+| `src/back/game/GameLauncher.ts` | Special detached spawn for `platform === "Flatimage"` |
+| `docs/reference/` | Compiled JS from working version — ground truth for launch behavior |
 
 ### Config fields (`config.json` → `flatimage` object)
 
@@ -30,13 +30,15 @@ FlatImage (`.flatimage` files) are portable Linux game executables — similar t
     "flatimageDirectory": "/path/to/flatimage/files",
     "autoDetect": true,
     "metadataCache": true,
-    "mediaDirectory": "/path/to/media/base"
+    "imagesDirectory": "/path/to/Images/Flatimage/",
+    "videosDirectory": "/path/to/Videos/Flatimage/"
   }
 }
 ```
 
 - `flatimageDirectory`: folder containing `.flatimage` executables
-- `mediaDirectory`: base folder that contains `Images/Flatimage/` and `Videos/Flatimage/` subfolders. If empty, falls back to `exodosPath`.
+- `imagesDirectory`: direct path to the `Images/Flatimage/` folder (bypasses exodosPath)
+- `videosDirectory`: direct path to the `Videos/Flatimage/` folder (bypasses exodosPath)
 
 ### Game loading flow
 
@@ -47,43 +49,72 @@ FlatImage (`.flatimage` files) are portable Linux game executables — similar t
    - `applicationPath`: absolute path to the `.flatimage` file
    - `launchCommand: ""`
    - Deterministic ID from SHA1 hash of filename
-3. Media is loaded via `loadPlatformImages("Flatimage", imagesBase)` where `imagesBase = mediaDirectory + "/Images"`
+3. Media is loaded via `loadPlatformImages("Flatimage", imagesDirectory)` and `loadPlatformVideos("Flatimage", videosDirectory)`
 4. Games are added to the main collection under library `"Flatimage"`
+5. When FlatImage support is enabled, "Flatimage" is filtered out of eXoDOS platforms (prevents duplicate library tab)
 
-### Launch flow
+### Launch flow — CURRENT STATE (BROKEN for some games)
 
 In `GameLauncher.launchGame()`, FlatImage games bypass the normal `exec()` + mapping system.
-Instead, they use `spawn()` with `detached: true` + `proc.unref()`.
 
-**Why?** FlatImages (like AppImages) use Linux user namespaces and/or FUSE to mount themselves. Running them as a child of an Electron process via `exec()` can prevent them from setting up their namespace environment. Spawning as a detached process avoids this.
+Current implementation (commit `2dcbec2`) — uses `./filename` relative path with cwd:
 
 ```typescript
-// Special case in launchGame():
 if (opts.game.platform === "Flatimage") {
-    const cwd = path.dirname(gamePath);
-    const proc = spawn(gamePath, [], { detached: true, stdio: "ignore", cwd, env: process.env });
+    const flatimageDir = path.dirname(gamePath);
+    const flatimageFilename = `./${path.basename(gamePath)}`;
+    const proc = spawn(flatimageFilename, [], {
+        detached: true,
+        stdio: ["ignore", "ignore", "pipe"],
+        cwd: flatimageDir,
+    });
+    // stderr captured for 3 seconds then logged
     proc.unref();
     return;
 }
 ```
 
+**STATUS: Does not work for Age of Empires II HD (and possibly others).** Some FlatImages launch (PID confirmed), others show PID but no window appears.
+
+### Launch flow — REFERENCE (working version)
+
+From `docs/reference/GameLauncher.ref.js` — the user's working installation at `/media/fabien/jeux/ExodosLauncher/exogui`:
+
+```javascript
+// Detection by applicationPath extension, not platform field
+if (opts.game.applicationPath.endsWith('.flatimage')) {
+    const proc = spawn(fullPath, [], {
+        detached: true,
+        stdio: 'ignore'   // ALL streams ignored — not piped
+    });
+    proc.unref();
+    return;
+}
+```
+
+Key differences from current implementation:
+1. **No `cwd`** — reference passes no working directory
+2. **`stdio: 'ignore'`** — all 3 streams ignored (not `["ignore","ignore","pipe"]`)
+3. **Absolute path** — `spawn(fullPath, ...)` not `spawn('./filename', ...)`
+4. **Detection by file extension** — not by `platform` field (though in our version platform IS set to "Flatimage")
+
+**The next fix to try:** revert to exact reference behavior — `spawn(absolutePath, [], { detached: true, stdio: 'ignore' })` with no `cwd`. This is confirmed working on the user's machine.
+
 ### Media folder structure
 
 ```
-{mediaDirectory}/
-  Images/
-    Flatimage/
-      Box - Front/
-        GameName-01.png
-      Screenshot - Gameplay/
-        GameName-01.png
-  Videos/
-    Flatimage/
-      GameName.mp4
+imagesDirectory/          (e.g. /media/fabien/jeux/ExodosLauncher/Images/Flatimage/)
+  Box - Front/
+    GameName-01.png
+  Screenshot - Gameplay/
+    GameName-01.png
+
+videosDirectory/          (e.g. /media/fabien/jeux/ExodosLauncher/Videos/Flatimage/)
+  GameName.mp4
 ```
 
 Image filenames must follow the pattern `{GameTitle}-NN.ext` (e.g. `Dune-01.png`).
-The game title used for matching is the `.flatimage` filename without extension.
+The game title used for matching is derived from `applicationPath` basename without extension.
 
 ### Platforms.xml
 
@@ -91,10 +122,30 @@ FlatImage games do NOT require `Platforms.xml`. If the file is missing (eXoDOS n
 
 ## Known decisions
 
-- `exodosPath` is NOT required for FlatImage-only usage. Set `mediaDirectory` to point to your media folder instead.
-- FlatImage platform is always treated as "native" (`native: true` in launch options).
-- The `.flatimage` mapping in `mappings.linux.json` exists but is bypassed by the special spawn logic.
+- `exodosPath` is NOT required for FlatImage-only usage.
+- FlatImage images/videos are configured with `imagesDirectory` + `videosDirectory` (absolute paths to the platform-specific folders).
+- The `fileServer.ts` routes `Images/Flatimage/` and `Videos/Flatimage/` requests to these custom directories.
+- When FlatImage support is enabled, `gamesMiddleware.ts` filters "Flatimage" from eXoDOS platform list to prevent duplicate library tab.
+
+## Reference files
+
+All files in `docs/reference/` are compiled JS from the user's working FlatImage installation at `/media/fabien/jeux/ExodosLauncher/exogui`. They are ground truth for how things should work.
+
+- `docs/reference/GameLauncher.ref.js` — launch logic summary
+- `docs/reference/FlatimageGameManager.ref.js` — game manager summary  
+- `docs/reference/GameLauncher.js` — full compiled GameLauncher from working version
+- `docs/reference/FlatimageGameManager.js` — full compiled FlatimageGameManager from working version
+- `docs/reference/ref.back.index.js` — full back process entry point from working version
+- `docs/reference/ref.config.util.js` — config utilities from working version
 
 ## Upstream
 
 This fork is based on [exogui/exogui](https://github.com/exogui/exogui). The upstream does NOT have FlatImage support — all FlatImage code is custom to this fork.
+
+## Environment
+
+- Dev machine: Ubuntu, `/home/projects/ProjetsClaude/exogui`
+- Deployed on: Linux Mint, `/media/fabien/jeux/PCVaultLauncher`
+- GitHub: https://github.com/flelard/PCVaultLauncher
+- Deploy workflow: build on Ubuntu → push → `git pull && npm run build` on Linux Mint
+- User does NOT modify code — relies entirely on Claude for all code changes
