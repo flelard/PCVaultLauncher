@@ -12,6 +12,7 @@ import {
 } from "@shared/Util";
 import { ChildProcess, exec, spawn } from "child_process";
 import { EventEmitter } from "events";
+import * as fs from "fs";
 import * as path from "path";
 
 export type LaunchAddAppOpts = LaunchBaseOpts & {
@@ -169,15 +170,36 @@ export namespace GameLauncher {
         );
 
         // FlatImage executables must run as fully detached processes (like AppImages).
-        // Using exec() can interfere with their namespace/FUSE setup.
+        // No cwd/env override — let the FlatImage manage its own environment.
         if (opts.game.platform === "Flatimage") {
-            const cwd = path.dirname(gamePath);
+            if (!fs.existsSync(gamePath)) {
+                log(logSource, `[ERROR] FlatImage not found: "${gamePath}"`);
+                return;
+            }
+            try {
+                fs.chmodSync(gamePath, 0o755);
+            } catch { /* non-fatal */ }
+
             const proc = spawn(gamePath, [], {
                 detached: true,
-                stdio: "ignore",
-                cwd,
-                env: process.env,
+                stdio: ["ignore", "ignore", "pipe"],
             });
+
+            // Capture stderr for a few seconds to catch early errors
+            if (proc.stderr) {
+                const chunks: string[] = [];
+                proc.stderr.on("data", (d: Buffer) => chunks.push(d.toString()));
+                setTimeout(() => {
+                    if (chunks.length > 0) {
+                        log(logSource, `[FlatImage stderr] "${opts.game.title}": ${chunks.join("")}`);
+                    }
+                }, 3000);
+            }
+
+            proc.on("error", (err) => {
+                log(logSource, `[ERROR] Failed to spawn FlatImage "${opts.game.title}": ${err.message}`);
+            });
+
             proc.unref();
             log(logSource, `Launch FlatImage "${opts.game.title}" (PID: ${proc.pid}) [ path: "${gamePath}" ]`);
             return;
