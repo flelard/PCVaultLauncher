@@ -20,7 +20,7 @@ export default defineConfig({
         }
     },
     html: {
-        title: "Exogui Launcher",
+        title: "PCVault Launcher",
         template: "./templates/index.html"
     },
     dev: {

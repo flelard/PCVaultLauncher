@@ -169,8 +169,8 @@ export namespace GameLauncher {
             opts.native
         );
 
-        // FlatImage: launch via exec with bash shell and clean env.
-        // Matches the reference implementation (docs/reference/GameLauncher.js line 179).
+        // FlatImage: launch via a detached Node process to escape Electron's process context.
+        // Electron's child processes can't run Wine/bwrap, but plain Node can (confirmed by testing).
         if (opts.game.platform === "Flatimage") {
             if (!fs.existsSync(gamePath)) {
                 const msg = `[ERROR] FlatImage not found: "${gamePath}"`;
@@ -182,16 +182,13 @@ export namespace GameLauncher {
                 fs.chmodSync(gamePath, 0o755);
             } catch { /* non-fatal */ }
 
-            const flatimageProc = exec(`"${gamePath}"`, {
-                shell: "/bin/bash",
-                env: {
-                    HOME: process.env.HOME,
-                    DISPLAY: process.env.DISPLAY,
-                    XAUTHORITY: process.env.XAUTHORITY,
-                    XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
-                    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                },
+            const escapedPath = gamePath.replace(/'/g, "'\\''");
+            const nodeScript = `require('child_process').exec('"${escapedPath}"',{shell:'/bin/bash',env:{HOME:'${process.env.HOME}',DISPLAY:'${process.env.DISPLAY || ""}',XAUTHORITY:'${process.env.XAUTHORITY || ""}',XDG_RUNTIME_DIR:'${process.env.XDG_RUNTIME_DIR || ""}',PATH:'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}})`;
+            const flatimageProc = spawn("/usr/bin/node", ["-e", nodeScript], {
+                detached: true,
+                stdio: "ignore",
             });
+            flatimageProc.unref();
             log(logSource, `Launch FlatImage "${opts.game.title}" (PID: ${flatimageProc.pid}) [ path: "${gamePath}" ]`);
             return;
         }
