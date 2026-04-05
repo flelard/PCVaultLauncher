@@ -53,52 +53,48 @@ FlatImage (`.flatimage` files) are portable Linux game executables — similar t
 4. Games are added to the main collection under library `"Flatimage"`
 5. When FlatImage support is enabled, "Flatimage" is filtered out of eXoDOS platforms (prevents duplicate library tab)
 
-### Launch flow — CURRENT STATE (BROKEN for some games)
+### Launch flow — CURRENT STATE (WORKING)
 
 In `GameLauncher.launchGame()`, FlatImage games bypass the normal `exec()` + mapping system.
 
-Current implementation (commit `2dcbec2`) — uses `./filename` relative path with cwd:
+Electron's process context prevents Wine/bwrap from working inside FlatImage containers. The fix is to spawn a detached `/usr/bin/node` process that exec's the game with a clean environment.
 
 ```typescript
 if (opts.game.platform === "Flatimage") {
-    const flatimageDir = path.dirname(gamePath);
-    const flatimageFilename = `./${path.basename(gamePath)}`;
-    const proc = spawn(flatimageFilename, [], {
+    if (!fs.existsSync(gamePath)) { /* error + return */ }
+    try { fs.chmodSync(gamePath, 0o755); } catch { /* non-fatal */ }
+
+    const nodeScript = `require('child_process').exec('"${escapedPath}"', {shell:'/bin/bash', env:{HOME:..., DISPLAY:..., XAUTHORITY:..., XDG_RUNTIME_DIR:..., PATH:...}})`;
+    const proc = spawn("/usr/bin/node", ["-e", nodeScript], {
         detached: true,
-        stdio: ["ignore", "ignore", "pipe"],
-        cwd: flatimageDir,
-    });
-    // stderr captured for 3 seconds then logged
-    proc.unref();
-    return;
-}
-```
-
-**STATUS: Does not work for Age of Empires II HD (and possibly others).** Some FlatImages launch (PID confirmed), others show PID but no window appears.
-
-### Launch flow — REFERENCE (working version)
-
-From `docs/reference/GameLauncher.ref.js` — the user's working installation at `/media/fabien/jeux/ExodosLauncher/exogui`:
-
-```javascript
-// Detection by applicationPath extension, not platform field
-if (opts.game.applicationPath.endsWith('.flatimage')) {
-    const proc = spawn(fullPath, [], {
-        detached: true,
-        stdio: 'ignore'   // ALL streams ignored — not piped
+        stdio: "ignore",
     });
     proc.unref();
     return;
 }
 ```
 
-Key differences from current implementation:
-1. **No `cwd`** — reference passes no working directory
-2. **`stdio: 'ignore'`** — all 3 streams ignored (not `["ignore","ignore","pipe"]`)
-3. **Absolute path** — `spawn(fullPath, ...)` not `spawn('./filename', ...)`
-4. **Detection by file extension** — not by `platform` field (though in our version platform IS set to "Flatimage")
+**STATUS:** All FlatImage games launch correctly — both native (Armagetron) and Wine (Age of Empires II HD).
 
-**The next fix to try:** revert to exact reference behavior — `spawn(absolutePath, [], { detached: true, stdio: 'ignore' })` with no `cwd`. This is confirmed working on the user's machine.
+### Root cause analysis
+
+The Electron process context (even with clean environment, matching security attributes, same Electron version) prevents bubblewrap (bwrap) from creating its sandbox when spawning Wine FlatImage games. The exact Electron mechanism is unclear (not env vars, not Seccomp, not NoNewPrivs, not Capabilities) but spawning via an independent `/usr/bin/node` process escapes this restriction.
+
+Key findings from investigation:
+1. `env -i` from terminal → works
+2. `node -e "exec(...)"` from terminal → works
+3. `exec(...)` from Electron back process → fails (even with clean env)
+4. `spawn("/usr/bin/node", ...)` from Electron back process → works
+
+### Investigation history
+
+1. **Spawn code** — tested spawn(detached), exec(shell:bash), both fail from Electron
+2. **Electron version** — tested 32.0.2 (same as reference) and 39.2.5, both fail
+3. **Environment variables** — compared between reference and PCVaultLauncher, clean env alone doesn't fix it from Electron
+4. **Security attributes** — Seccomp, NoNewPrivs, Capabilities nearly identical between reference and PCVaultLauncher back processes
+5. **Main vs back process** — both versions launch from back process
+6. **Reference uses exec()** — not spawn(detached) as previously assumed (GameLauncher.js line 179)
+7. **Solution** — spawn detached /usr/bin/node that exec's the game, escaping Electron's process context
 
 ### Media folder structure
 
