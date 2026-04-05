@@ -1,7 +1,7 @@
 import { IAppConfigData } from "@shared/config/interfaces";
 import * as http from "http";
 import * as fs from "fs";
-import * as mime from "mime";
+import { Mime } from "mime";
 import * as path from "path";
 import { getFilePathExtension } from "@shared/Util";
 import { LogFunc } from "@back/types";
@@ -185,7 +185,7 @@ export class FileServer {
                     res.end();
                 } else {
                     const contentType =
-                        mime.getType(path.extname(filePath)) ||
+                        new Mime().getType(path.extname(filePath)) ||
                         "application/octet-stream";
                     const total = stats.size;
                     const range = req.headers.range;
