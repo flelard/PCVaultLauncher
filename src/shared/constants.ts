@@ -1,5 +1,5 @@
 /** Title of the main window. */
-export const APP_TITLE: string = "exogui";
+export const APP_TITLE: string = "PCVault Launcher";
 
 // Exodos libraries
 export const ARCADE = "arcade";

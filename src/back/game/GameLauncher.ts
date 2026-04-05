@@ -169,8 +169,8 @@ export namespace GameLauncher {
             opts.native
         );
 
-        // FlatImage: launch as a fully detached process with absolute path.
-        // Matches the reference implementation (docs/reference/GameLauncher.ref.js).
+        // FlatImage: launch via exec with bash shell and clean env.
+        // Matches the reference implementation (docs/reference/GameLauncher.js line 179).
         if (opts.game.platform === "Flatimage") {
             if (!fs.existsSync(gamePath)) {
                 const msg = `[ERROR] FlatImage not found: "${gamePath}"`;
@@ -182,13 +182,17 @@ export namespace GameLauncher {
                 fs.chmodSync(gamePath, 0o755);
             } catch { /* non-fatal */ }
 
-            const proc = spawn(gamePath, [], {
-                detached: true,
-                stdio: "ignore",
+            const flatimageProc = exec(`"${gamePath}"`, {
+                shell: "/bin/bash",
+                env: {
+                    HOME: process.env.HOME,
+                    DISPLAY: process.env.DISPLAY,
+                    XAUTHORITY: process.env.XAUTHORITY,
+                    XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
+                    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                },
             });
-
-            proc.unref();
-            log(logSource, `Launch FlatImage "${opts.game.title}" (PID: ${proc.pid}) [ path: "${gamePath}" ]`);
+            log(logSource, `Launch FlatImage "${opts.game.title}" (PID: ${flatimageProc.pid}) [ path: "${gamePath}" ]`);
             return;
         }
 
