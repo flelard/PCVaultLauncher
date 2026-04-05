@@ -166,7 +166,7 @@ export function HomePage(props: HomePageProps) {
                         }`}</h4>
                     </div>
                     <div>
-                        <h4>{`exogui: ${app.getVersion()}`}</h4>
+                        <h4>{`PCVault Launcher: ${app.getVersion()}`}</h4>
                     </div>
                 </div>
                 <div className="home-page__subheader">
